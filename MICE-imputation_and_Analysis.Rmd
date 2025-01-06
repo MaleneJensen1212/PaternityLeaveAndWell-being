@@ -1,0 +1,633 @@
+---
+title: "MICE_imputation"
+author: "Annie & Malene"
+date: "2024-11-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("pacman")
+
+library("pacman")
+
+
+pacman::p_load(tidyverse, lubridate, miceadds, micemd, mitml, naniar, ggmice, VIM, MASS, finalfit, mice, statmod, MVN,lmtest, ltm)
+
+#devtools::install_github(repo = "amices/mice")
+
+#pacman::p_load(statmod, report)
+
+```
+
+
+```{r}
+citation('finalfit')
+citation('vissmiss')
+citation('mice')
+citation('miceadds')
+RStudio.Version() 
+#Vectors for variables
+```
+
+```{r}
+packageVersion('mice')
+```
+
+```{r}
+Merged_df <- read.csv("merged_df_dummy.csv")
+```
+
+```{r}
+#Removing the 3 Particpants with NA in Group - among with almost all other variables
+Merged_df <- Merged_df[!is.na(Merged_df$Group), ]
+```
+
+```{r}
+str(Merged_df)
+```
+
+```{r}
+# Little's MCAR test
+#Test the null-hypothesis that data is MCAR
+#Only works for continous variables!
+
+Continous_df <- Merged_df[,c("FarAlder","Postnummer", "BabyAlder.uger." ,"SleepQuality","Depression","Anxiety", "WellBeingScore", "Group", "ParticipantID", "TimePoint", "BarselNuværende", "Førstegangsforælder", "Region", "Erhverv", "Uddannelsesniveau", "Arbejdsstatus", "FarBarselsperioder", "MorBarselsperioder")]
+
+#Singular error with Sammenboende
+
+mcar_test(Continous_df)
+
+
+#Significant result
+#Data is not MCAR
+```
+
+
+
+```{r}
+Merged_df$TimePoint <- as.factor(Merged_df$TimePoint)
+Merged_df$Sammenboende <- as.factor(Merged_df$Sammenboende)
+Merged_df$BarselNuværende <- as.factor(Merged_df$BarselNuværende)
+Merged_df$Førstegangsforælder <- as.factor(Merged_df$Førstegangsforælder)
+Merged_df$Region  <- as.factor(Merged_df$Region)
+Merged_df$Erhverv  <- as.factor(Merged_df$Erhverv)
+Merged_df$Uddannelsesniveau  <- as.factor(Merged_df$Uddannelsesniveau)
+Merged_df$Arbejdsstatus  <- as.factor(Merged_df$Arbejdsstatus)
+#Do not change group to factor since Mice don't allow this for class variables
+#Merged_df$Group  <- as.factor(Merged_df$Group)
+Merged_df$FarBarselsperioder <- as.factor(Merged_df$FarBarselsperioder)
+Merged_df$MorBarselsperioder <- as.factor(Merged_df$MorBarselsperioder)
+
+
+str(Merged_df)
+
+```
+
+
+
+```{r}
+plot_pattern(Merged_df,
+  square = F,
+  rotate = T,
+  npat = 20)
+
+```
+
+```{r}
+library(VIM)
+
+# List of four key variables (Anxiety, SleepQuality, WellBeingScore, Depression)
+core_variables <- c("Anxiety", "SleepQuality", "WellBeingScore", "Depression")
+
+# List of the other variables you want to combine with the core variables
+other_variables <- c("Erhverv", "Arbejdsstatus", "BarselNuværende", "Førstegangsforælder", 
+                     "Uddannelsesniveau", "BabyAlder.uger.", "FarAlder", "FarBarselsperioder", 
+                     "Postnummer", "Region")
+
+# Create all combinations of core variables with other variables
+combinations <- combn(c(core_variables, other_variables), 2, simplify = FALSE)
+
+# Loop through each combination of variables and generate a margin plot
+for (comb in combinations) {
+  
+  # Select the two variables for this combination
+  var1 <- comb[1]
+  var2 <- comb[2]
+  
+  # Ensure that the columns exist in the dataframe
+  if (all(c(var1, var2) %in% colnames(Merged_df))) {
+    
+    # Convert variables to numeric if they are not already numeric
+    Merged_df[[var1]] <- as.numeric(as.character(Merged_df[[var1]]))
+    Merged_df[[var2]] <- as.numeric(as.character(Merged_df[[var2]]))
+    
+    # Automatically calculate xlim and ylim based on the data range
+    if (is.numeric(Merged_df[[var1]]) & is.numeric(Merged_df[[var2]])) {
+      # If both variables are numeric, use the range of the data
+      xlim_range <- range(Merged_df[[var1]], na.rm = TRUE)
+      ylim_range <- range(Merged_df[[var2]], na.rm = TRUE)
+    } else {
+      # For factor variables, automatically set limits based on the factor levels
+      xlim_range <- c(1, length(unique(Merged_df[[var1]])))
+      ylim_range <- c(1, length(unique(Merged_df[[var2]])))
+    }
+    
+    # Generate marginplot for the selected variables
+    marginplot(Merged_df[, c(var1, var2)],
+      xlim = xlim_range, ylim = ylim_range,
+      col = mdc(1:2), pch = 19,
+      cex = 1.2, cex.lab = 1.2, cex.numbers = 1.3,
+      main = paste(var1, "vs", var2)  # Title for each plot
+    )
+    
+  } else {
+    # Print a message if the combination is not valid (e.g., missing column)
+    cat("Skipping combination: ", var1, "vs", var2, " (One or both variables are missing)\n")
+  }
+}
+
+
+```
+
+```{r}
+Residuals <-summary(aggr(Merged_df, sortVar=TRUE))$combinations
+```
+
+```{r}
+vis_miss(Merged_df)+
+  theme(axis.text.x = element_text(angle = 80))
+
+
+#source: https://www.rdocumentation.org/packages/visdat/versions/0.6.0/topics/vis_miss
+
+#Check if names can be rotated
+
+
+
+```
+
+```{r}
+gg_miss_upset(Merged_df, nsets = 10, nintersects = NA)
+
+
+```
+
+
+
+```{r}
+
+timeplot <- gg_miss_var(Merged_df, facet = TimePoint)+
+  labs(title = "Missing Data by Variable and Time Point",
+       x = "Variables",
+       y = "Number of Missing Values") +
+  theme_minimal()
+
+
+
+Merged_df_filtered <- Merged_df %>%
+  drop_na(Group)
+
+groupplot <- gg_miss_var(Merged_df_filtered, facet = Group) +
+  facet_wrap(~Group, labeller = as_labeller(c(`0` = "Pre-Law", `1` = "Post-Law")))+
+  labs(title = "Missing Data by Variable and Group",
+       x = "Variables",
+       y = "Number of Missing Values") +
+  theme_minimal()
+
+
+
+gg_miss_var(Merged_df,
+            facet = Erhverv)
+```
+
+
+
+```{r}
+# Missing values map from finalfit. Important for this that variables are coded correctly
+
+Merged_df %>%
+  missing_plot()
+
+
+# Source: https://cran.r-project.org/web/packages/finalfit/vignettes/missing.html
+```
+
+
+```{r}
+# Heatmap showing positive and negative correlations in complete observations
+# Interestingly, there is negative correlation between WellBeingScore and other physchological variables. Depression and Anxiety is positivelt correlated
+# Might also make sense that postnumer and region is negatively correlated, but this depends on the order or region which is quite random. 
+plot_corr(Merged_df, rotate = T)
+```
+
+
+
+```{r}
+# Create Predictormatrix based on pearson correlation, minimum correlation 0.1
+PredictorMatrix <- quickpred(Merged_df)
+
+PredictorMatrix
+
+#Column name predicts Row name. 1 if predicts, 0 if it doesn't predict.
+
+```
+
+
+```{r}
+# ORIGINAL PREDICTIRMATRIX
+# Cluster variable= -2, Random effect = 2, Fixed effects = 1, Non-predictors = 0
+# UNsure if we should actually do this for all variables we impute
+
+PredictorMatrix["BarselNuværende", ] <- c(2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -2, 1, 0, 0, 0, 0, 0) 
+PredictorMatrix["Førstegangsforælder", ] <- c(2, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1)
+PredictorMatrix["Region", ] <- c(2, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0)
+PredictorMatrix["Erhverv", ] <- c(2, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0)
+PredictorMatrix["Uddannelsesniveau", ] <- c(2, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0)
+PredictorMatrix["FarAlder", ] <- c(2, 2, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0)
+PredictorMatrix["BabyAlder.uger.", ] <- c(2, 2, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1)
+PredictorMatrix["Postnummer", ] <- c(2, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0)
+PredictorMatrix["Arbejdsstatus", ] <- c(2, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0)
+PredictorMatrix["FarBarselsperioder", ] <- c(2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, -2, 0, 1, 0, 0, 0, 0)
+PredictorMatrix["MorBarselsperioder", ] <- c(2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, -2, 0, 0, 0, 0, 0, 1)
+
+
+PredictorMatrix["Depression", ] <- c(2,2,0, 0, 1, 0, 0, 1, 1, 0, 0, 0, -2, 0, 1, 1, 0, 1, 1)
+PredictorMatrix["Anxiety", ] <- c(2, 2, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, -2, 0, 1, 1, 1, 0, 1) 
+PredictorMatrix["SleepQuality", ] <- c(2, 2, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, -2, 0, 1, 1, 1, 1, 0)
+PredictorMatrix["WellBeingScore", ] <- c(2, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, -2, 0, 1, 0, 1, 1, 1) 
+
+
+PredictorMatrix
+```
+
+
+
+```{r}
+plot_pred(PredictorMatrix, rotate = T)
+```
+
+```{r}
+str(Merged_df)
+```
+
+```{r}
+
+#Heteroscedasticity, we violate assumptions with 2l.pmm but what can we do.. use it to add to the discussion about why we see values that differ.
+
+# Fit a simple linear model
+lm_model1 <- lm(Depression ~ Anxiety + SleepQuality + WellBeingScore + Group, data = Merged_df)
+
+lm_model2 <- lm(Anxiety ~ Depression + SleepQuality + WellBeingScore + Group, data = Merged_df)
+
+lm_model3 <- lm(SleepQuality ~ Anxiety + Depression + WellBeingScore + Group, data = Merged_df)
+
+lm_model4 <- lm(WellBeingScore ~ Anxiety + Depression + SleepQuality + Group, data = Merged_df)
+
+
+plot(lm_model1$fitted.values, lm_model1$residuals)
+abline(h = 0, col = "red")
+
+plot(lm_model2$fitted.values, lm_model2$residuals)
+abline(h = 0, col = "red")
+
+plot(lm_model3$fitted.values, lm_model3$residuals)
+abline(h = 0, col = "red")
+
+
+plot(lm_model4$fitted.values, lm_model4$residuals)
+abline(h = 0, col = "red")
+
+
+bptest(lm_model3)
+```
+
+```{r}
+
+
+# Fit the mixed-effects model for Depression
+model_depression <- lmer(Depression ~  Førstegangsforælder + Uddannelsesniveau + FarAlder + MorBarselsperioder + WellBeingScore + Anxiety + SleepQuality + (1|Group), Merged_df)
+
+
+residuals <- residuals(model_depression)
+fitted <- fitted(model_depression)
+
+ggplot(data = NULL, aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values",
+       x = "Fitted Values",
+       y = "Residuals")
+
+
+model_anxiety <- lmer(Anxiety ~  Førstegangsforælder + Uddannelsesniveau + Arbejdsstatus + MorBarselsperioder + FarBarselsperioder + WellBeingScore + Depression + SleepQuality + (1|Group), Merged_df)
+
+residuals1 <- residuals(model_anxiety)
+fitted1 <- fitted(model_anxiety)
+
+ggplot(data = NULL, aes(x = fitted1, y = residuals1)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values",
+       x = "Fitted Values",
+       y = "Residuals")
+
+
+model_wellbeingscore <- lm(WellBeingScore ~ Førstegangsforælder + MorBarselsperioder + Depression + SleepQuality + Anxiety + (1|Group), Merged_df)
+
+residuals2 <- residuals(model_wellbeingscore)
+fitted2 <- fitted(model_wellbeingscore)
+
+ggplot(data = NULL, aes(x = fitted2, y = residuals2)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values",
+       x = "Fitted Values",
+       y = "Residuals") 
+
+
+model_sleepquality <- lmer(SleepQuality ~ Førstegangsforælder + BarselNuværende + Erhverv + BabyAlder.uger. + Arbejdsstatus + MorBarselsperioder + Depression + WellBeingScore + Anxiety + (1|Group), Merged_df)
+
+residuals3 <- residuals(model_sleepquality)
+fitted3 <- fitted(model_sleepquality)
+
+ggplot(data = NULL, aes(x = fitted3, y = residuals3)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values",
+       x = "Fitted Values",
+       y = "Residuals")
+
+
+
+```
+
+
+```{r}
+# IMPUTATION
+
+suppressWarnings(suppressMessages(
+    ImputedData <- mice(Merged_df,
+        visitSequence = "monotone",
+        meth = c("", "", "","polyreg", "logreg", "polyreg", "polyreg", "polyreg", "pmm", "pmm", "pmm", "polyreg", "", "polyreg", "polyreg", "2l.pmm", "2l.pmm", "2l.pmm", "2l.pmm"),
+        pred = PredictorMatrix, printFlag = F, maxit = 20, m = 27, seed = 67
+    )
+))
+
+#Group is not imputed, Mor- og FarBarselsperioder isn't either since sp litlle is missing, and plots wont converge for MotherBarselsperioder and outcome is weird
+
+print(ImputedData$method)
+```
+
+
+```{r}
+#Code for saving and loading Mice object 
+
+#FinalImputedData2 <- "./FinalImputedData2"
+
+#write.mice.imputation(ImputedData, name= "FinalImputedData2", mids2spss=F) 
+
+#list.files(pattern = "FinalImputedData2")
+
+load("FinalImputedData2/FinalImputedData2.Rdata")
+```
+
+
+
+
+```{r}
+mi.res$visitSequence
+```
+
+```{r}
+ggmice::plot_trace(mi.res)
+```
+
+
+```{r}
+
+plot(mi.res)
+
+miceadds::Rhat.mice(mi.res)
+```
+
+
+
+
+```{r}
+# extract the completed data in long format
+#implong <- complete(mi.res, 'long')
+```
+
+
+```{r}
+pacman::p_load(mice)
+mice::densityplot(mi.res, ~Anxiety) #it seems to impute negative values for Anxiety 
+
+densityplot(mi.res, ~Depression) #and maybe for depression as well
+
+densityplot(mi.res, ~SleepQuality)
+
+densityplot(mi.res, ~WellBeingScore)
+
+densityplot(mi.res, ~Region)
+
+densityplot(mi.res, ~Erhverv)
+
+densityplot(mi.res, ~Uddannelsesniveau)
+
+densityplot(mi.res, ~Førstegangsforælder)
+
+densityplot(mi.res, ~Arbejdsstatus)
+
+densityplot(mi.res, ~BabyAlder.uger.)
+
+densityplot(mi.res, ~FarAlder)
+
+densityplot(mi.res, ~FarBarselsperioder)
+
+densityplot(mi.res, ~BarselNuværende)
+
+densityplot(mi.res, ~Postnummer)
+
+```
+
+
+```{r}
+
+mice::stripplot(mi.res, Anxiety)
+
+mice::stripplot(mi.res, SleepQuality)
+
+mice::stripplot(mi.res, Depression)
+
+mice::stripplot(mi.res, WellBeingScore)
+
+mice::stripplot(mi.res, Arbejdsstatus)
+
+mice::stripplot(mi.res, BabyAlder.uger.)
+
+mice::stripplot(mi.res, Erhverv)
+
+mice::stripplot(mi.res, Arbejdsstatus)
+
+mice::stripplot(mi.res, Region)
+
+mice::stripplot(mi.res, FarAlder)
+
+mice::stripplot(mi.res, Førstegangsforælder)
+
+mice::stripplot(mi.res, Uddannelsesniveau)
+
+mice::stripplot(mi.res, FarBarselsperioder)
+
+mice::stripplot(mi.res, BarselNuværende)
+
+mice::stripplot(mi.res, Postnummer)
+
+```
+
+```{r}
+
+mice::bwplot(mi.res, Anxiety)
+
+mice::bwplot(mi.res, SleepQuality)
+
+mice::bwplot(mi.res, Depression)
+
+mice::bwplot(mi.res, WellBeingScore)
+
+mice::bwplot(mi.res, Arbejdsstatus)
+
+mice::bwplot(mi.res, BabyAlder.uger.)
+
+mice::bwplot(mi.res, Erhverv)
+
+mice::bwplot(mi.res, Arbejdsstatus)
+
+mice::bwplot(mi.res, Region)
+
+mice::bwplot(mi.res, FarAlder)
+
+mice::bwplot(mi.res, Førstegangsforælder)
+
+mice::bwplot(mi.res, Uddannelsesniveau)
+
+mice::bwplot(mi.res, FarBarselsperioder)
+
+mice::bwplot(mi.res, BarselNuværende)
+
+```
+
+
+```{r}
+obj <- complete(mi.res,4)
+
+mvn(obj, univariatePlot = "qqplot")
+
+plot(obj$SleepQuality)
+```
+
+
+
+
+```{r}
+# Check actual values for to see if there are negative values
+summary(mi.res$data$Depression)
+
+summary(mi.res$data$SleepQuality)
+
+summary(mi.res$data$Anxiety)
+```
+
+```{r}
+ggplot(Merged_df, aes(Anxiety))+
+  geom_histogram()+
+  scale_x_continuous(breaks = seq(0, 21, by = 1)) 
+```
+
+
+
+```{r}
+# Check imputed values for Anxiety to see if there are negative values 
+summary(mi.res$imp$Depression)
+#summary(mi.res$imp$Anxiety)
+#summary(mi.res$imp$SleepQuality)
+summary(mi.res$imp$WellBeingScore)
+```
+
+```{r}
+# REGRESSION ASSUMPTIONS
+
+
+```
+
+
+
+
+```{r}
+my_tweedie <- statmod::tweedie(var.power = 1.5, link.power = 0)
+```
+
+```{r}
+# DEPRESSION
+
+Depressionfit1 <- with(mi.res, glm(Depression ~ Uddannelsesniveau + Region + factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = tweedie(var.power = 1.5, link.power = 0)))
+            
+Depressionfit2 <- with(mi.res, glm(Depression ~ factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = tweedie(var.power = 1.5, link.power = 0)))
+            
+
+summary(mice::pool(Depressionfit1))
+
+summary(mice::pool(Depressionfit2))
+
+
+
+```
+
+```{r}
+
+
+Anxietyfit1 <- with(mi.res, glm(Anxiety ~ Uddannelsesniveau + Region + factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = tweedie(var.power = 1.5, link.power = 0)))
+            
+Anxietyfit2 <- with(mi.res, glm(Anxiety~ factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = tweedie(var.power = 1.5, link.power = 0)))
+            
+
+summary(mice::pool(Anxietyfit1))
+
+summary(mice::pool(Anxietyfit2))
+```
+
+
+
+```{r}
+
+#Sleep Quality
+
+#gamma 
+
+SleepQualityfit1 <- with(mi.res, glm(SleepQuality ~ Uddannelsesniveau + Region + factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = Gamma(link = "inverse")))
+            
+SleepQualityfit2 <- with(mi.res, glm(SleepQuality ~ factor(Group)*TimePoint + (1+TimePoint|ParticipantID),  family = inverse.gaussian(link = "identity")))
+            
+
+summary(mice::pool(SleepQualityfit1))
+summary(mice::pool(SleepQualityfit2))
+```
+
+```{r}
+
+#Inverse gaussian for left skewwness
+
+WellBeingScorefit1 <- with(mi.res, glm(WellBeingScore ~ Uddannelsesniveau + Region + factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = gaussian(link = "identity")))
+            
+WellBeingScorefit2 <- with(mi.res, glm(WellBeingScore ~ factor(Group)*TimePoint + (1+TimePoint|ParticipantID), family = gaussian(link = "identity")))
+            
+
+summary(mice::pool(WellBeingScorefit1))
+summary(mice::pool(WellBeingScorefit2))
+
+```

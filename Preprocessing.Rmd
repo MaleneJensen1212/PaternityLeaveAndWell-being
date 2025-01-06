@@ -1,0 +1,1510 @@
+---
+title: "Data_exploration2"
+author: "Annie & Malene"
+date: "2024-11-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages("pacman")
+
+library("pacman")
+
+pacman::p_load(tidyverse, lubridate, tidyr)
+```
+
+*Demographics*
+
+```{r}
+Demographics <- read.csv("Demographics/Demographics.csv")
+```
+
+*Make data wide format*
+
+```{r}
+# List of questions that should use CleanResponse if available
+clean_questions <- c("Bor du med din partner?", "Er du førstegangsforældre?", "Hvor gammel er din baby nu (i uger)", "Hvilket postnummer bor du i?", "Er din baby 4-20 uger gammel", "Er din baby født d. 2 august 2022 eller efter?", 
+                     "Hvornår regner din partner med at starte sin anden barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner din partner med at slutte sin anden barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner din partner med at starter sin første barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner din partner med at slutte sin første barselsperiode?(vær opmærksom på årstal)", 
+                     "Hvornår regner din partner med at starte sin tredje barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner din partner med at slutte sin tredje barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner du med at starte din første barselsperiode?(vær opmærksom på årstal)", 
+                     "Hvornår regner du med at slutte din første barselsperiode?(vær opmærksom på årstal)", 
+                     "Hvornår regner du med at starte din anden barselsperiode?(vær opmærksom på årstal)", 
+                     "Hvornår regner du med at slutte din anden barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner du med at starte din tredje barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvornår regner du med at slutte din tredje barselsperiode? (vær opmærksom på årstal)", 
+                     "Hvor mange barselsperioder regner din partner med at tage inden for barnets første 12 måneder?", 
+                     "Hvor mange barselsperioder regner du med at tage inden for barnets første 12 måneder?")
+
+#OMIT PARTICIPANT 893, and 589 BC OF DUPLICATE ANSWERS
+Demographics <- Demographics %>%
+  filter(!(ParticipantID %in% c(589, 893)))
+
+Demographics_wide <- Demographics %>%
+  # Create a new column that uses CleanResponse for specific questions and Response for the rest
+  mutate(CombinedResponse = ifelse(Question %in% clean_questions, 
+                                   CleanResponse, 
+                                   Response)) %>%
+  
+  # Then, pivot to wide format
+  pivot_wider(
+    id_cols = c(ParticipantID, TimePoint),   # Keep these columns as is
+    names_from = Question,                   # Use Question values as new column names
+    values_from = CombinedResponse           # Use the new combined column as values
+  )
+
+Demographics_wide <- Demographics_wide %>% 
+  rename("Sammenboende" = "Bor du med din partner?",
+         "Førstegangsforælder" = "Er du førstegangsforældre?",
+         "BabyAlder(uger)" = "Hvor gammel er din baby nu (i uger)",
+         "Postnummer" = "Hvilket postnummer bor du i?",
+         "4-20 uger?" = "Er din baby 4-20 uger gammel",
+         "Group" = "Er din baby født d. 2 august 2022 eller efter?",
+         "MorStart1" = "Hvornår regner din partner med at starter sin første barselsperiode? (vær opmærksom på årstal)",
+         "MorSlut1" = "Hvornår regner din partner med at slutte sin første barselsperiode?(vær opmærksom på årstal)",
+         "MorStart2" = "Hvornår regner din partner med at starte sin anden barselsperiode? (vær opmærksom på årstal)",
+         "MorSlut2" = "Hvornår regner din partner med at slutte sin anden barselsperiode? (vær opmærksom på årstal)",
+         "MorStart3" = "Hvornår regner din partner med at starte sin tredje barselsperiode? (vær opmærksom på årstal)",
+         "MorSlut3" = "Hvornår regner din partner med at slutte sin tredje barselsperiode? (vær opmærksom på årstal)",
+         "FarStart1" = "Hvornår regner du med at starte din første barselsperiode?(vær opmærksom på årstal)",
+         "FarSlut1" = "Hvornår regner du med at slutte din første barselsperiode?(vær opmærksom på årstal)",
+         "FarStart2" = "Hvornår regner du med at starte din anden barselsperiode?(vær opmærksom på årstal)", 
+         "FarSlut2" = "Hvornår regner du med at slutte din anden barselsperiode? (vær opmærksom på årstal)", 
+         "FarStart3" = "Hvornår regner du med at starte din tredje barselsperiode? (vær opmærksom på årstal)", 
+         "FarSlut3" = "Hvornår regner du med at slutte din tredje barselsperiode? (vær opmærksom på årstal)", 
+         "MorBarselsperioder" = "Hvor mange barselsperioder regner din partner med at tage inden for barnets første 12 måneder?",
+         "FarBarselsperioder" = "Hvor mange barselsperioder regner du med at tage inden for barnets første 12 måneder?", 
+         "BabyFødselsdato" = "Hvilken dato er dit barn født?",
+         "BarselNuværende" = "Hvem har på nuværende tidspunkt barsel",
+         "Region" = "Hvilken region bor du i?",
+         "Erhverv" = "Hvad arbejder du inden for?",
+         "Uddannelsesniveau" = "Hvad er den højeste uddannelse, du har fuldført?",
+         "FarAlder" = "Hvor gammel er du?",
+         "Arbejdsstatus" = "Hvad er din arbejdsstatus?"
+         )
+
+# # Identify duplicate rows based on ParticipantID, TimePoint, and Question
+# duplicates <- Demographics %>%
+#   dplyr::summarise(n = dplyr::n(), .by = c(ParticipantID, TimePoint, Question)) %>%
+#   dplyr::filter(n > 1)
+# 
+# print(duplicates)
+```
+
+
+
+```{r}
+
+Demographics_wide$BabyFødselsdato <- as.Date(Demographics_wide$BabyFødselsdato)
+
+# Replace NA's in Group by whether the Child is born before the legislation or after
+ 
+Cutoff_Date <- as.Date("2022-08-02")
+
+# Impute 'NA' values in 'Group' based on the cutoff date
+Demographics_wide <- Demographics_wide %>%
+  mutate(Group = ifelse(is.na(Group), ifelse(BabyFødselsdato >= Cutoff_Date, 1, 0), Group))
+
+
+```
+
+```{r}
+#Convert Group from charactor to factor
+Demographics_wide$Group <-as.factor(Demographics_wide$Group)
+```
+
+```{r}
+# Identify and handle mismatches in the Group column
+group_counts <- Demographics_wide %>%
+  group_by(ParticipantID) %>%                         # Group by participant to ensure unique counts
+  summarize(Group = n_distinct(Group)) %>%            # Count the distinct values in Group for each participant
+  mutate(Mismatch = ifelse(Group > 1, "Mismatch", "No Mismatch")) %>%  # Flag if more than one distinct value
+  ungroup() %>%                                       # Remove grouping for further analysis
+  count(Mismatch)                                     # Count how many participants have mismatches
+
+# Print participants with mismatches (those with more than one distinct value in the Group column)
+mismatched_participants <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  filter(n_distinct(Group) > 1) %>%
+  select(ParticipantID, Group) %>%
+  distinct()
+
+# Summarize counts of Group levels (1, 0, and NA) assuming no mismatch
+group_counts_no_mismatch <- Demographics_wide %>%
+  filter(!ParticipantID %in% mismatched_participants$ParticipantID) %>%  # Exclude mismatched participants
+  group_by(ParticipantID) %>%
+  summarize(Group = first(Group)) %>%
+  mutate(Group = case_when(
+    is.na(Group) ~ "NA",                               # Label NA values as "NA"
+    Group == "1" ~ "Post-law",                         # Label Group "1"
+    Group == "0" ~ "Pre-law"                          # Label Group "0"
+  )) %>%
+  count(Group)                                         # Count occurrences of each group
+
+# Plot the summary counts with ggplot2
+ggplot(group_counts_no_mismatch, aes(x = Group, y = n, fill = Group)) +
+  geom_col() +
+  geom_text(aes(label = n), vjust = -0.5) +            # Display exact numbers above bars
+  labs(title = "Summary of Group Counts (No Mismatch)",
+       x = "Group",
+       y = "Number of Participants") +
+  theme_minimal()
+
+# If needed, output the mismatched participants
+print(mismatched_participants)
+
+```
+
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by timepoint
+  group_by(ParticipantID) %>%
+  fill(Group, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+```
+
+
+
+```{r}
+
+# Summarize counts of Group 1, Group 2, and NA values in the Group column
+group_counts <- Demographics_wide %>%
+  group_by(ParticipantID) %>%                         # Group by participant to ensure unique counts
+  summarize(Group = first(Group)) %>%                  # Keep only the first occurrence of Group per participant
+  mutate(Group = case_when(
+    is.na(Group) ~ "NA",                               # Label NA values as "NA"
+    Group == 1 ~ "Post-law",                            # Label Group 1
+    Group == 0 ~ "Pre-law"                             # Label Group 2
+  )) %>%
+  count(Group)                                         # Count occurrences of each group
+
+# Plot the summary counts with ggplot2
+ggplot(group_counts, aes(x = Group, y = n, fill = Group)) +
+  geom_col() +
+  geom_text(aes(label = n), vjust = -0.5) +            # Display exact numbers above bars
+  labs(title = "Group Counts",
+       x = "Group",
+       y = "n") +
+  theme_minimal()
+
+```
+```{r}
+
+#Read in mothers data
+
+CouplesKey <- read.csv("NewDataMothers/CoupleKeyFile.csv")
+
+Mothers <- read.csv("NewDataMothers/MothersData.csv")
+```
+
+```{r}
+
+#Create mother group variable
+Mothers <- Mothers %>% 
+  filter(Question == "Er din baby født d. 2 august 2022 eller efter?") %>% 
+  select(ParticipantID, Response) %>% 
+  mutate(GroupMother = ifelse(Response == "Min baby er født før d. 2 august 2022", 0,
+                              ifelse(Response == "Min baby er født d. 2 august 2022 eller efter",1, NA)))
+
+# Rename to MotherParticipantID to make column names match
+Mothers <- Mothers %>% 
+  rename(MotherParticipantID = ParticipantID)
+
+#Join mothers dataframes
+MothersGroup <- left_join(CouplesKey, Mothers, by = "MotherParticipantID")
+
+#Remove unnecessary repose variable
+MothersGroup <- MothersGroup %>% 
+  select(-Response)
+
+#Rename father id to match Demographics_wide df
+MothersGroup <- MothersGroup %>% 
+  rename(ParticipantID = FatherParticipantID)
+
+
+```
+
+
+```{r}
+
+# Remove duplicates from MothersGroup, keeping only one row per ParticipantID to avoid many to many error
+MothersGroup_unique <- MothersGroup %>%
+  distinct(ParticipantID, .keep_all = TRUE) 
+
+# Make sure GroupMother is factor
+MothersGroup_unique$GroupMother<-as.factor(MothersGroup_unique$GroupMother)
+
+
+# Join mothers group data to fathers data
+Demographics_wide <- Demographics_wide %>% 
+  left_join(MothersGroup_unique %>% select(ParticipantID, GroupMother), by = "ParticipantID")
+
+```
+
+```{r}
+# Replace missing father group data by mothers group data
+
+Demographics_wide$Group[is.na(Demographics_wide$Group)] <- Demographics_wide$GroupMother[is.na(Demographics_wide$Group)]
+
+```
+
+
+```{r}
+# Asses NA's in group
+
+# Summarize counts of Group 1, Group 2, and NA values in the Group column
+group_counts2 <- Demographics_wide %>%
+  group_by(ParticipantID) %>%                         # Group by participant to ensure unique counts
+  summarize(Group = first(Group)) %>%                  # Keep only the first occurrence of Group per participant
+  mutate(Group = case_when(
+    is.na(Group) ~ "NA",                                                    
+    Group == 0 ~ "Pre-law",
+    Group == 1 ~ "Post-law", 
+  )) %>%
+  count(Group)                                         # Count occurrences of each group
+
+# Plot the summary counts with ggplot2
+ggplot(group_counts2, aes(x = Group, y = n, fill = Group)) +
+  geom_col() +
+  geom_text(aes(label = n), vjust = -0.5) +            # Display exact numbers above bars
+  labs(title = "Group Counts",
+       x = "Group",
+       y = "n") +
+  theme_minimal()
+
+```
+
+```{r}
+# #Assessing participants with NA in group
+# # Filter rows where 'group' is NA
+# participants_with_na <- Demographics_wide[is.na(Demographics_wide$Group), ]
+# 
+# # Display the result
+# print(participants_with_na)
+```
+
+```{r}
+#if Group is na, then take MorStart1 + 4 weeks (graviditetsorlov) to get the date at which their kid was born - BabyFødselsdato. MorStart1 is yyyy-mm-dd. 
+
+# Replace NA's in Group by whether the Child is born before the legislation or after
+
+ # Ensure the MorStart1 and BabyFødselsdato columns are in Date format
+Demographics_wide$BabyFødselsdato <- as.Date(Demographics_wide$BabyFødselsdato)
+Demographics_wide$MorStart1 <- as.Date(Demographics_wide$MorStart1)
+
+Demographics_wide$BabyFødselsdato[is.na(Demographics_wide$Group)] <- 
+  Demographics_wide$MorStart1[is.na(Demographics_wide$Group)] + 28
+
+
+#Cutoff_Date <- as.Date("2022-08-02")
+
+# Ensure 'Group' is numeric to avoid coercion issues
+Demographics_wide$Group <- as.numeric(as.character(Demographics_wide$Group))
+
+# Impute 'NA' values in 'Group' based on the cutoff date
+Demographics_wide <- Demographics_wide %>%
+  mutate(Group = ifelse(
+    is.na(Group), 
+    ifelse(BabyFødselsdato >= Cutoff_Date, 1, 0), 
+    Group
+  ))
+
+```
+
+
+```{r}
+# class(Demographics_wide$BabyFødselsdato) # Should be "Date"
+# class(Cutoff_Date) 
+```
+
+
+*Controlling for length of leave in Group*
+
+```{r}
+#Finding length of leave by taking dates: FarSlut1-FarStart1 (which should give a length in days) + FarSlut2-FarStart2 + FarSlut3-FarSlut3. 
+#Or something similar to find out how many days the fathers were on leave from the dates where they start and end their periods of leave. Some fathers haven't filled it out, and some have NAs in some of the columns FarStart1, FarSlut1, ForStart2, FarSlut2, FarStart3, and FarStlut3
+
+#FarStart1, is when the father starts the first period of leave, where FarSlut1 is where they end their first period. 
+#FarStart2 is when the father starts the second period of leave, where FarSlut2 is where they end their second period and the same for FarStart3 and FarSlut3. 
+#Maybe a solution could also be to find the difference between the two dates? Or do you have better suggestions?
+
+Demographics_wide$FarStart1 <- as.Date(Demographics_wide$FarStart1)
+Demographics_wide$FarSlut1 <- as.Date(Demographics_wide$FarSlut1)
+Demographics_wide$FarStart2 <- as.Date(Demographics_wide$FarStart2)
+Demographics_wide$FarSlut2 <- as.Date(Demographics_wide$FarSlut2)
+Demographics_wide$FarStart3 <- as.Date(Demographics_wide$FarStart3)
+Demographics_wide$FarSlut3 <- as.Date(Demographics_wide$FarSlut3)
+
+# Calculate total leave duration grouped by ParticipantID
+df_leave_duration <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  mutate(
+    Period1 = as.numeric(difftime(FarSlut1, FarStart1, units = "days")),
+    Period2 = as.numeric(difftime(FarSlut2, FarStart2, units = "days")),
+    Period3 = as.numeric(difftime(FarSlut3, FarStart3, units = "days")),
+    TotalLeave = rowSums(across(c(Period1, Period2, Period3)), na.rm = TRUE)
+  ) %>%
+  mutate(TotalLeave = ifelse(is.na(Period1) & is.na(Period2) & is.na(Period3), NA_real_, TotalLeave)) %>% 
+  ungroup()
+
+#Creating subset of df, so that only ParticipantID, Group, TimePoint, and LeaveDuration is present:
+df_leave_duration_subset <- df_leave_duration %>%
+  select(ParticipantID, Group, TimePoint, TotalLeave)
+
+
+# Step 1: Create a subset with the latest TimePoint for each ParticipantID
+df_latest_timepoint <- df_leave_duration_subset %>%
+  group_by(ParticipantID) %>%
+  arrange(ParticipantID, desc(TimePoint)) %>%
+  slice(1) %>%  # Get the row with the latest TimePoint per ParticipantID
+  ungroup()
+
+# Step 2: Check if LeaveDuration is negative or above 365 and replace if necessary
+df_final_result <- df_latest_timepoint %>%
+  mutate(
+    # If LeaveDuration is negative or above 365, set it to NA for further conditional handling
+    TotalLeave = ifelse(TotalLeave < 0 | TotalLeave > 365, NA_real_, TotalLeave)
+  ) %>%
+  # If LeaveDuration is NA, use the LeaveDuration from the previous time point if it exists
+  left_join(
+    df_leave_duration_subset %>%
+      group_by(ParticipantID) %>%
+      arrange(ParticipantID, desc(TimePoint)) %>%
+      slice(2) %>%  # Get the second latest TimePoint per ParticipantID
+      ungroup(),
+    by = "ParticipantID",
+    suffix = c("", "_Previous")
+  ) %>%
+  mutate(
+    # Replace LeaveDuration with the previous time point's value if it's NA and valid
+    TotalLeave = ifelse(is.na(TotalLeave) & !is.na(TotalLeave_Previous) & TotalLeave_Previous < 365, 
+                           TotalLeave_Previous, 
+                           TotalLeave)
+  ) %>%
+  select(ParticipantID, Group, TimePoint, TotalLeave)
+
+
+
+
+# Summarize leave durations by group for plotting
+df_summary <- df_final_result %>%
+  group_by(Group) %>%
+  summarize(MeanLeave = mean(TotalLeave, na.rm = TRUE),
+            SDLeave = sd(TotalLeave, na.rm = TRUE))
+
+# Plot the differences in leave duration between groups
+ggplot(df_final_result, aes(x = factor(Group), y = TotalLeave, fill = factor(Group))) +
+  geom_boxplot(alpha = 0.7) + # Boxplot for distribution
+  geom_point(position = position_jitter(width = 0.2), alpha = 0.5) + # Add jittered points
+  labs(
+    title = "Comparison of Leave Duration Between Groups",
+    x = "Group",
+    y = "Total Leave Duration (days)"
+  ) +
+  coord_cartesian(ylim = c(0, 400)) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("0" = "skyblue", "1" = "orange")) +
+  scale_x_discrete(labels = c("0" = "Pre-law", "1" = "Post-law"))
+
+
+```
+
+```{r}
+# Perform a t-test to compare LeaveDuration between Group 0 and Group 1
+t_test_result <- t.test(TotalLeave ~ Group, data = df_final_result)
+
+# View the test result
+print(t_test_result)
+```
+
+
+```{r}
+#Make it up in weeks
+# Add a column with TotalLeave in weeks
+df_final_result <- df_final_result %>%
+  mutate(
+    TotalLeave_weeks = TotalLeave / 7  # Convert TotalLeave from days to weeks
+  )
+
+# Summarize leave durations by group for plotting
+df_summary <- df_final_result %>%
+  group_by(Group) %>%
+  summarize(MeanLeave = mean(TotalLeave_weeks, na.rm = TRUE),
+            SDLeave = sd(TotalLeave_weeks, na.rm = TRUE))
+
+# Plot the differences in leave duration between groups
+ggplot(df_final_result, aes(x = factor(Group), y = TotalLeave_weeks, fill = factor(Group))) +
+  geom_boxplot(alpha = 0.7) + # Boxplot for distribution
+  geom_point(position = position_jitter(width = 0.2), alpha = 0.5) + # Add jittered points
+  labs(
+    title = "Comparison of Leave Duration Between Groups",
+    x = "Group",
+    y = "Total Leave Duration (weeks)"
+  ) +
+  coord_cartesian(ylim = c(0, 50)) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("0" = "skyblue", "1" = "orange")) +
+  scale_x_discrete(labels = c("0" = "Pre-law", "1" = "Post-law"))
+
+```
+
+```{r}
+# Perform a t-test to compare LeaveDuration between Group 0 and Group 1
+t_test_result_weeks <- t.test(TotalLeave_weeks ~ Group, data = df_final_result)
+
+# View the test result
+print(t_test_result_weeks)
+```
+
+*WHO5 Data*
+
+```{r}
+# Load WHO5 data
+WHO5 <- read.csv("WHO5/WHO5.csv")
+
+# Asses missingness
+#md.pattern(WHO5)
+
+```
+
+```{r}
+# Check if there are always 5 different questions per participant per timepoint to make sure calculated score takes all questions into consideration
+
+check_questions <- WHO5 %>%
+  group_by(ParticipantID, TimePoint) %>%
+  summarise(num_questions = n_distinct(Question), .groups = "drop") %>%
+  mutate(is_valid = num_questions == 5)
+
+# View rows where the number of questions is not 5
+invalid_rows <- check_questions %>% filter(is_valid == FALSE)
+
+# Should return 0 rows
+print(invalid_rows)
+```
+
+```{r}
+# Calculate Well-being Score
+WellBeingScore <- WHO5 %>% 
+  group_by(ParticipantID, TimePoint) %>% 
+  summarise(WellBeingScore = ifelse(any(is.na(CleanResponse)), NA, sum(CleanResponse, na.rm = TRUE)), .groups = "drop") # Returns NA if any Na's per Particiant per Timepoint
+
+#md.pattern(WellBeingScore)
+
+```
+
+*EPDS Data*
+
+```{r}
+EPDS <- read.csv("EPDS/EPDS.csv")
+
+# Asses missingness
+#md.pattern(EPDS)
+
+```
+
+```{r}
+# Check if there are always 10 different questions per participant per timepoint to make sure calculated score takes all questions into consideration
+
+check_questions2 <- EPDS %>%
+  group_by(ParticipantID, TimePoint) %>%
+  summarise(num_questions = n_distinct(Question), .groups = "drop") %>%
+  mutate(is_valid = num_questions == 10)
+
+# View rows where the number of questions is not 10
+invalid_rows2 <- check_questions %>% filter(is_valid == FALSE)
+
+# Should return 0 rows
+print(invalid_rows2)
+
+#We have visually check that the CleanReponse value is correct with the reversal of values (0-3)
+```
+
+
+```{r}
+# Calculate Depression Score
+Depression <- EPDS %>% 
+  group_by(ParticipantID, TimePoint) %>% 
+  summarise(Depression = ifelse(any(is.na(CleanResponse)), NA, sum(CleanResponse, na.rm = TRUE)), .groups = "drop") # Returns NA if any Na's per Particiant per Timepoint
+
+#Asses missingness
+#md.pattern(Depression)
+
+```
+
+*Anxiety (GAD7)*
+
+```{r}
+
+# Load data
+GAD7 <- read.csv("GAD7/GAD7.csv")
+
+# Asses missingness
+#md.pattern(GAD7)
+
+```
+
+```{r}
+# Check if there are always 7 different questions per participant per timepoint to make sure calculated score takes all questions into consideration
+
+check_questions3 <- GAD7 %>%
+  group_by(ParticipantID, TimePoint) %>%
+  summarise(num_questions = n_distinct(Question), .groups = "drop") %>%
+  mutate(is_valid = num_questions == 7)
+
+# View rows where the number of questions is not 10
+invalid_rows3 <- check_questions %>% filter(is_valid == FALSE)
+
+# Should return 0 rows
+print(invalid_rows3)
+
+```
+```{r}
+# Calculate Anxiety Score
+Anxiety <- GAD7 %>% 
+  group_by(ParticipantID, TimePoint) %>% 
+  summarise(Anxiety = ifelse(any(is.na(CleanResponse)), NA, sum(CleanResponse, na.rm = TRUE)), .groups = "drop") # Returns NA if any Na's per Particiant per Timepoint
+
+#Asses missingness
+#md.pattern(Anxiety)
+```
+
+*Sleep (PSQI)*
+
+*Component 1 -  Subjective sleep quality* --> Q9
+
+*Component 2 - Sleep latency* --> Q5a + Q2
+Q2 needs to be recalculated: 
+<= 15 minutes 0, 
+16-30 minutes: 1, 
+31-60 minutes: 2, 
+> 60 minutes: 3 
+THEN add the two questions (Q2 and Q5a) corresponding points, which will result in the following points for component 2: 
+0: 0 points, 
+1-2: 1 point, 
+3-4: 2 points, 
+5-6: 3 points. 
+
+*Component 3 - Sleep duration* --> Q4, which needs to be recalculated: 
+> 7 hours: 0 points, 
+6-7 hours: 1 point, 
+5-6 hours: 2 points, 
+< 5 hours: 3 points
+
+*Component 4 - Sleep efficiency* --> We calculate ourselfes: (Q4/(diff from Q1 to Q3)) x 100%
+> 85% 0 points, 
+75-84% 1 point, 
+65-74% 2 points, 
+< 65% 3 points 
+
+*Component 5 - : Sleep disturbance* --> Q5b + Q5c + Q5d + Q5e + Q5f + Q5g + Q5h + Q5i + Q5j: 
+0: 0 points, 
+1-9: 1 point, 
+10-18: 2 points, 
+19-27: 3 points
+
+*Component 6 -  Use of sleep medication* --> Q6
+
+*Component 7 - Daytime dysfunction* --> Q7 + Q8: 
+0: 0 point, 
+1-2: 1 points, 
+3-4: 2 points, 
+5-6: 3 points
+
+```{r}
+PSQI <- read.csv("PSQI/PSQI.csv")
+
+#Omitting participants with duplicated answers
+PSQI <- PSQI %>% 
+  filter(!(ParticipantID %in% c(589, 893)))
+
+#Making the format wide instead of long
+PSQI_wide <- PSQI %>% 
+  pivot_wider(
+    id_cols = c(ParticipantID, TimePoint),
+    names_from = QuestionNum,
+    values_from = CleanResponse
+  )
+
+#Checking for duplicates and omitting them
+# duplicates1 <- PSQI %>%  
+#   dplyr::summarise(n = dplyr::n(), .by = c(ParticipantID, TimePoint, QuestionNum)) %>% 
+#   dplyr::filter(n > 1L)
+```
+
+```{r}
+#Checklist before calculating components:
+#- Recalculate Q2 (look at component2)
+#- Recalculate Q4 (look at component 3)
+#- Calculate difference from timestamps in Q1 (go to bed) to Q3 (get out of bed)
+
+# Add a new column 'Q2_Score' based on the conditions for Q2 FOR COMPONENT 2
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Q2_Score = case_when(
+      Q2 <= 15 ~ 0,
+      Q2 >= 16 & Q2 <= 30 ~ 1,
+      Q2 >= 31 & Q2 <= 60 ~ 2,
+      Q2 > 60 ~ 3
+    )
+  )
+
+# Add another column 'Q4_Score' based on the condition for Q4 FOR COMPONENT 3
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Q4_Score = case_when(
+      Q4 > 7 ~ 0,            #More than 7 hours
+      Q4 >= 6 & Q4 <= 7 ~ 1, #Between 6 and 7 hours
+      Q4 >= 5 & Q4 <= 6 ~ 2, #Besteen 5 and 6 hours
+      Q4 < 5 ~ 3             #Less than 5 hours
+    )
+  )
+
+# Calculating how man hours they sleep at night: FOR COMPONENT 4
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Q1_time = as.POSIXct(Q1, format = "%H:%M"),
+    Q3_time = as.POSIXct(Q3, format = "%H:%M"),
+    Hours_in_bed = as.numeric(difftime(Q3_time, Q1_time, units = "hours"))
+  )
+# Adjust for overnight times where Q3 is on the next day
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Hours_in_bed = ifelse(Hours_in_bed < 0, Hours_in_bed + 24, Hours_in_bed)
+  )
+
+
+# Identify participants with ranges or "or" in Q1 or Q3
+ambiguous_responses <- PSQI_wide %>%
+  filter(str_detect(Q1, "-|or") | str_detect(Q3, "-|or"))
+#For these responses the first number in the range was used which makes the durations an approximate. 
+```
+
+
+```{r}
+# COMPONENT 2 - Calculation:
+PSQI_wide$Q5a <- as.numeric(PSQI_wide$Q5a)
+PSQI_wide$Q2_Score <- as.numeric(PSQI_wide$Q2_Score)
+# Add Component2 column based on the sum of Q2_score and Q5a
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Component2_raw = Q2_Score + Q5a,  # Calculate the sum
+    Component2 = case_when(
+      Component2_raw == 0 ~ 0,       # If the sum is 0 -> Component2 is 0
+      Component2_raw >= 1 & Component2_raw <= 2 ~ 1,  # Between 1 and 2 -> Component2 is 1
+      Component2_raw >= 3 & Component2_raw <= 4 ~ 2,  # Between 3 and 4 -> Component2 is 2
+      Component2_raw >= 5 & Component2_raw <= 6 ~ 3   # Between 5 and 6 -> Component2 is 3
+    )
+  ) 
+```
+
+```{r}
+# COMPONENT 4 - Sleep efficiency 
+PSQI_wide$Q4 <- as.numeric(PSQI_wide$Q4)
+PSQI_wide$Hours_in_bed <- as.numeric(PSQI_wide$Hours_in_bed)
+# Add Component4 based on the calculated percentage
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Component4_raw = (Q4 / Hours_in_bed) * 100,  # Calculate percentage
+    Component4 = case_when(
+      Component4_raw > 85 ~ 0,                   # > 85% -> Component4 is 0
+      Component4_raw >= 75 & Component4_raw <= 84 ~ 1,  # 75-84% -> Component4 is 1
+      Component4_raw >= 65 & Component4_raw <= 74 ~ 2,  # 65-74% -> Component4 is 2
+      Component4_raw < 65 ~ 3                   # < 65% -> Component4 is 3
+    )
+  )
+```
+
+```{r}
+# COMPONENT 5:
+PSQI_wide$Q5b <- as.numeric(PSQI_wide$Q5b)
+PSQI_wide$Q5c <- as.numeric(PSQI_wide$Q5c)
+PSQI_wide$Q5d <- as.numeric(PSQI_wide$Q5d)
+PSQI_wide$Q5e <- as.numeric(PSQI_wide$Q5e)
+PSQI_wide$Q5f <- as.numeric(PSQI_wide$Q5f)
+PSQI_wide$Q5g <- as.numeric(PSQI_wide$Q5g)
+PSQI_wide$Q5h <- as.numeric(PSQI_wide$Q5h)
+PSQI_wide$Q5i <- as.numeric(PSQI_wide$Q5i)
+PSQI_wide$Q5j1 <- as.numeric(PSQI_wide$Q5j1)
+# Calculate Component5
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Component5_raw = Q5b + Q5c + Q5d + Q5e + Q5f + Q5g + Q5h + Q5i + Q5j1,  # Sum columns
+    Component5 = case_when(
+      Component5_raw == 0 ~ 0,       # If sum is 0 -> Component5 is 0
+      Component5_raw >= 1 & Component5_raw <= 9 ~ 1,   # 1-9 -> Component5 is 1
+      Component5_raw >= 10 & Component5_raw <= 18 ~ 2, # 10-18 -> Component5 is 2
+      Component5_raw >= 19 & Component5_raw <= 27 ~ 3  # 19-27 -> Component5 is 3
+    )
+  )
+
+```
+
+```{r}
+# COMPONENT 7
+PSQI_wide$Q7 <- as.numeric(PSQI_wide$Q7)
+PSQI_wide$Q8 <- as.numeric(PSQI_wide$Q8)
+# Calculate Component7
+PSQI_wide <- PSQI_wide %>%
+  mutate(
+    Component7_raw = Q7 + Q8,  # Sum Q7 and Q8
+    Component7 = case_when(
+      Component7_raw == 0 ~ 0,        # If sum is 0 -> Component7 is 0
+      Component7_raw >= 1 & Component7_raw <= 2 ~ 1,  # 1-2 -> Component7 is 1
+      Component7_raw >= 3 & Component7_raw <= 4 ~ 2,  # 3-4 -> Component7 is 2
+      Component7_raw >= 5 & Component7_raw <= 6 ~ 3   # 5-6 -> Component7 is 3
+    )
+  )
+```
+
+```{r}
+# PSQI Global Score:
+PSQI_wide$Q9 <- as.numeric(PSQI_wide$Q9)
+PSQI_wide$Q6 <- as.numeric(PSQI_wide$Q6)
+
+PSQI_wide <- PSQI_wide %>% 
+  mutate(PSQI_Score = Q9 + Component2 + Q4_Score + Component4 + Component5 + Q6 + Component7)
+```
+
+```{r}
+SleepQuality <- PSQI_wide %>% 
+  select("ParticipantID","TimePoint", "PSQI_Score") %>% 
+  rename("SleepQuality" = "PSQI_Score")
+
+```
+
+
+```{r}
+#Merging into one big dataframe
+Merged_df <- Demographics_wide %>% 
+  left_join(WellBeingScore, by = c("ParticipantID", "TimePoint")) %>% 
+  left_join(Depression,  by = c("ParticipantID", "TimePoint")) %>% 
+  left_join(Anxiety, by = c("ParticipantID", "TimePoint")) %>% 
+  left_join(SleepQuality,  by = c("ParticipantID", "TimePoint"))
+
+```
+
+```{r}
+# Remove the specified columns
+Merged_df <- Merged_df %>%
+  select(-"4-20 uger?", -MorStart3, -MorStart1, -MorSlut3, 
+         -MorStart2, -MorSlut2, -MorSlut1, 
+         -FarStart3, -FarSlut3, -FarStart2, 
+         -FarStart1, -FarSlut1, -FarSlut2, -GroupMother, -BabyFødselsdato)
+```
+
+
+```{r}
+#write.csv(Merged_df, "merged_df.csv", row.names = FALSE)
+```
+
+
+*Dummy Coding*
+- BarselNuværende: Mor, Far, Begge
+- Region: Region Midtjylland, Region Syddanmark, and so on
+- Erhverv: Offentlig adminestration, Andet, Bygge og Anlæg, and so on. 
+- Udannelsesniveau: Lang videregående uddannelse, Erhvervsfaglig uddannelse, Kort videregående uddannelse (fx erhvervsakademiuddannelse), and so on
+- Arbejdsstatus: Fuldtidsarbejde, Arbejdsløs, and so on. 
+- 
+```{r}
+# Dummy coding the specified columns
+Merged_df$BarselNuværende <- as.numeric(factor(Merged_df$BarselNuværende, 
+    levels = c("Mor", 
+               "Far", 
+               "Begge")))
+#Mor: 1
+#Far: 2
+#Begge: 3
+
+Merged_df$Region <- as.numeric(factor(Merged_df$Region, 
+    levels = c("Region Midtjylland", 
+               "Region Syddanmark", 
+               "Region Nordjylland", 
+               "Region Sjælland", 
+               "Region Hovedstaden")))
+#Region Midtjylland: 1
+#Region Syddanmark: 2
+#Region Nordjylland: 3
+#Region Sjælland: 4
+#Region Hovedstaden: 5
+
+Merged_df$Erhverv <- as.numeric(factor(Merged_df$Erhverv, 
+    levels = c("Landbrug, skovbrug og fiskeri", 
+               "Industri, råstofindvinding og forsyningsvirksomhed",
+               "Bygge og anlæg",
+               "Handel og transport",
+               "Information og kommunikation",
+               "Finansering og forsikring",
+               "Ejendomshandel og udlejning",
+               "Erhvervsservice",
+               "Offentlig administration, undervisning og sundhed",
+               "Kultur, fritid og anden service",
+               "Andet",
+               "Ønsker ikke at svare")))
+
+# (1)    🔾 Landbrug, skovbrug og fiskeri
+# (2)    🔾 Industri, råstofindvinding og forsyningsvirksomhed
+# (3)    🔾 Bygge og anlæg
+# (4)    🔾 Handel og transport
+# (5)    🔾 Information og kommunikation
+# (6)    🔾 Finansering og forsikring
+# (7)    🔾 Ejendomshandel og udlejning
+# (8)    🔾 Erhvervsservice
+# (9)    🔾 Offentlig administration, undervisning og sundhed
+# (10)    🔾 Kultur, fritid og anden service
+# (11)    🔾 Andet
+# (12)    🔾 Ønsker ikke at svare 
+
+Merged_df$Uddannelsesniveau <- as.numeric(factor(Merged_df$Uddannelsesniveau, 
+    levels = c("Grundskole",
+               "Gymnasial uddannelse",
+               "Erhvervsfaglig uddannelse",
+               "Kort videregående uddannelse (fx erhvervsakademiuddannelse)",
+               "Mellemlang videregående uddannelse (fx professionsbachelor)",
+               "Bacheloruddannelse",
+               "Lang videregående uddannelse",
+               "Ph.d. og forskeruddannelse",
+               "Ønsker ikke at oplyse")))
+
+#1: Grundskole
+#2: Gymnasial uddannelse
+#3: Erhvervsfaglig uddannelse
+#4: Kort videregående uddannelse (fx erhvervsakademiuddannelse)
+#5: Mellemlang videregående uddannelse (fx professionsbachelor)
+#6: Bacheloruddannelse
+#7: Lang videregående uddannelse
+#8: Ph.d. og forskeruddannelse
+#9: Ønsker ikke at oplyse
+
+Merged_df$Arbejdsstatus <- as.numeric(factor(Merged_df$Arbejdsstatus, 
+    levels = c("Fuldtidsarbejde", "Deltidsarbejde", 
+               "Selvstændig", "Arbejdsløs", 
+               "Studerende")))
+
+#1: Fuldtidsarbejde
+#2: Deltidsarbejde
+#3: Selvstændig
+#4: Arbejdsløs
+#5: Studerende
+
+```
+
+```{r}
+unique(Merged_df$BarselNuværende) # Output will be numeric codes
+levels(factor(Merged_df$BarselNuværende)) # Shows the original categories
+```
+
+
+```{r}
+#write.csv(Merged_df, "merged_df_dummy.csv", row.names = FALSE)
+```
+
+```{r}
+str(Demographics_wide)
+```
+
+```{r}
+Demographics_wide <-Demographics_wide[!is.na(Demographics_wide$Group),] #Home many does this remove?
+```
+
+```{r}
+str(Demographics_wide)
+```
+
+```{r}
+# Calculate the number of unique participant IDs
+num_unique_participants <- length(unique(Demographics_wide$ParticipantID))
+
+# Print the result
+print(num_unique_participants)
+
+```
+
+
+```{r}
+Demographics_wide$ParticipantID <- as.factor(Demographics_wide$ParticipantID)
+Demographics_wide$Group <- as.factor(Demographics_wide$Group)
+Demographics_wide$TimePoint <- as.factor(Demographics_wide$TimePoint)
+Demographics_wide$Sammenboende <- as.factor(Demographics_wide$Sammenboende)
+Demographics_wide$BarselNuværende <- as.factor(Demographics_wide$BarselNuværende)
+Demographics_wide$Førstegangsforælder <- as.factor(Demographics_wide$Førstegangsforælder)
+Demographics_wide$Region  <- as.factor(Demographics_wide$Region)
+Demographics_wide$Erhverv  <- as.factor(Demographics_wide$Erhverv)
+Demographics_wide$Uddannelsesniveau  <- as.factor(Demographics_wide$Uddannelsesniveau)
+Demographics_wide$Arbejdsstatus  <- as.factor(Demographics_wide$Arbejdsstatus)
+#Do not change group to factor since Mice don't allow this for class variables
+#Merged_df$Group  <- as.factor(Merged_df$Group)
+Demographics_wide$FarBarselsperioder <- as.factor(Demographics_wide$FarBarselsperioder)
+Demographics_wide$MorBarselsperioder <- as.factor(Demographics_wide$MorBarselsperioder)
+
+
+str(Demographics_wide)
+
+```
+
+
+
+*Demographics Table*
+
+```{r}
+# Function to adjust percentages to sum to 100
+adjust_percentages <- function(counts) {
+  raw_percentages <- counts / sum(counts) * 100
+  rounded_percentages <- round(raw_percentages, 2)
+  adjustment <- 100 - sum(rounded_percentages)
+  
+  # Add the adjustment to the largest percentage
+  largest_idx <- which.max(rounded_percentages)
+  rounded_percentages[largest_idx] <- rounded_percentages[largest_idx] + adjustment
+  
+  return(rounded_percentages)
+}
+
+
+summarize_categorical <- function(data, column_name) {
+  # Count values including NAs
+  counts <- table(data[[column_name]], useNA = "ifany")
+  
+  # Handle empty columns
+  if (length(counts) == 0) {
+    return(data.frame(Value = "NA", Count = 0, Percentage = 0))
+  }
+  
+  # Adjust percentages to sum to 100
+  percentages <- adjust_percentages(as.numeric(counts))
+  
+  # Create the summary table
+  data.frame(
+    Value = names(counts),  # Includes NA as a category due to useNA = "ifany"
+    Count = as.integer(counts),
+    Percentage = percentages
+  )
+}
+
+
+# Function to summarize numerical variables
+summarize_numerical <- function(data, column_name) {
+  summary_stats <- data %>%
+    summarise(
+      Mean = round(mean(!!sym(column_name), na.rm = TRUE), 2),
+      SD = round(sd(!!sym(column_name), na.rm = TRUE), 2),
+      Min = min(!!sym(column_name), na.rm = TRUE),
+      Max = max(!!sym(column_name), na.rm = TRUE),
+      Median = median(!!sym(column_name), na.rm = TRUE),
+      NA_Count = sum(is.na(!!sym(column_name))
+    )
+  )
+  summary_stats
+}
+
+# Create a summary for categorical and numerical variables
+demographics_summary <- list()
+
+# Specify categorical and numerical columns
+categorical_columns <- c("Sammenboende", "Førstegangsforældre", "Region", 
+                         "Erhverv", "Uddannelsesniveau", "Arbejdsstatus", "Group")
+numerical_columns <- c("FarAlder")
+
+# Summarize categorical variables
+for (col in categorical_columns) {
+  demographics_summary[[col]] <- summarize_categorical(Demographics_wide, col)
+}
+
+# Summarize numerical variables
+for (col in numerical_columns) {
+  demographics_summary[[col]] <- summarize_numerical(Demographics_wide, col)
+}
+
+# View summaries
+demographics_summary
+
+```
+
+
+
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by TimePoint
+  group_by(ParticipantID) %>%
+  fill(Førstegangsforælder, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+
+```
+
+
+```{r}
+library(dplyr)
+
+# Summarize the data by ParticipantID and take the first value for Førstegangsforælder
+Førstegangsforælder_df <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    # Take the first value of Førstegangsforælder (including NA if it's the first value)
+    First_Førstegangsforælder = first(Førstegangsforælder)
+  ) %>%
+  ungroup()  # Remove grouping after summarization
+
+# Create the count table based on First_Førstegangsforælder
+Førstegangsforælder_counts <- Førstegangsforælder_df %>%
+  count(First_Førstegangsforælder)
+
+# Print the summarized count data
+print(Førstegangsforælder_counts)
+
+```
+
+```{r}
+# Calculate the number of unique ParticipantIDs after grouping
+num_unique_participants_grouped <- nrow(Førstegangsforælder_df)
+
+# Print the result
+print(num_unique_participants_grouped)
+
+```
+
+
+```{r}
+# Cross-check with the original unique count
+original_unique_count <- length(unique(Demographics_wide$ParticipantID))
+print(original_unique_count == num_unique_participants_grouped)  # Should return TRUE
+
+```
+
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by TimePoint
+  group_by(ParticipantID) %>%
+  fill(FarAlder, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+
+```
+
+
+```{r}
+
+
+# Summarize the data by ParticipantID and calculate the statistics for the first non-NA value of FarAlder
+summary_FarAlder <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    # Take the first non-NA value for FarAlder per participant
+    First_FarAlder = first(na.omit(FarAlder)), 
+    
+    .groups = 'drop'  # Drop the grouping after summarizing
+  ) %>%
+  summarize(
+    # Summary statistics based on the first non-NA value for FarAlder
+    Count_NA = sum(is.na(First_FarAlder)),                # Count how many participants have NA as their first value
+    Count_NonNA = sum(!is.na(First_FarAlder)),            # Count how many participants have a non-NA first value
+    Min = min(First_FarAlder, na.rm = TRUE),              # Minimum of the first non-NA values
+    Max = max(First_FarAlder, na.rm = TRUE),              # Maximum of the first non-NA values
+    Median = median(First_FarAlder, na.rm = TRUE),        # Median of the first non-NA values
+    Mean = mean(First_FarAlder, na.rm = TRUE),            # Mean of the first non-NA values
+    SD = sd(First_FarAlder, na.rm = TRUE)                 # Standard deviation of the first non-NA values
+  )
+
+# Print the summarized data
+print(summary_FarAlder)
+
+
+```
+
+
+
+```{r}
+#Old calculation
+
+summary_FarAlder <- Demographics_wide %>%
+  summarize(
+    Count_NA = sum(is.na(FarAlder)),                 # Count of NA's
+    Count_NonNA = sum(!is.na(FarAlder)),             # Count of non-NA's
+    Min = min(FarAlder, na.rm = TRUE),               # Minimum value
+    Max = max(FarAlder, na.rm = TRUE),               # Maximum value
+    Median = median(FarAlder, na.rm = TRUE),         # Median value
+    Mean = mean(FarAlder, na.rm = TRUE),             # Mean value
+    SD = sd(FarAlder, na.rm = TRUE)                  # Standard deviation
+  )
+
+summary_FarAlder
+```
+
+
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by TimePoint
+  group_by(ParticipantID) %>%
+  fill(Erhverv, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+
+```
+
+```{r}
+
+# Summarize the data by ParticipantID and take the first non-NA value for Erhverv
+summary_Erhverv <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    First_Erhverv = first(na.omit(Erhverv)),  # Take the first non-NA value for Erhverv
+    .groups = 'drop'  # Drop the grouping after summarizing
+  ) %>%
+  count(First_Erhverv)  # Count how many participants have each value for Erhverv
+
+# Print the summarized data
+print(summary_Erhverv)
+
+
+```
+
+```{r}
+
+#Old calculation
+# Summarize by ParticipantID: Count and percentage of each Arbejdsstatus
+participant_summary <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    Count_Fuldtidsarbejde = sum(Arbejdsstatus == "Fuldtidsarbejde", na.rm = TRUE),
+    Count_Deltidsarbejde = sum(Arbejdsstatus == "Deltidsarbejde", na.rm = TRUE),
+    Count_Selvstændig = sum(Arbejdsstatus == "Selvstændig", na.rm = TRUE),
+    Count_Arbejdsløs = sum(Arbejdsstatus == "Arbejdsløs", na.rm = TRUE),
+    Count_Studerende = sum(Arbejdsstatus == "Studerende", na.rm = TRUE),
+    Count_NA = sum(is.na(Arbejdsstatus), na.rm = TRUE)
+  ) %>%
+  mutate(
+    Percent_Fuldtidsarbejde = (Count_Fuldtidsarbejde / (Count_Fuldtidsarbejde + Count_Deltidsarbejde + Count_Selvstændig + Count_Arbejdsløs + Count_Studerende + Count_NA)) * 100,
+    Percent_Deltidsarbejde = (Count_Deltidsarbejde / (Count_Fuldtidsarbejde + Count_Deltidsarbejde + Count_Selvstændig + Count_Arbejdsløs + Count_Studerende + Count_NA)) * 100,
+    Percent_Selvstændig = (Count_Selvstændig / (Count_Fuldtidsarbejde + Count_Deltidsarbejde + Count_Selvstændig + Count_Arbejdsløs + Count_Studerende + Count_NA)) * 100,
+    Percent_Arbejdsløs = (Count_Arbejdsløs / (Count_Fuldtidsarbejde + Count_Deltidsarbejde + Count_Selvstændig + Count_Arbejdsløs + Count_Studerende + Count_NA)) * 100,
+    Percent_Studerende = (Count_Studerende / (Count_Fuldtidsarbejde + Count_Deltidsarbejde + Count_Selvstændig + Count_Arbejdsløs + Count_Studerende + Count_NA)) * 100,
+    Percent_NA = (Count_NA / (Count_Fuldtidsarbejde + Count_Deltidsarbejde + Count_Selvstændig + Count_Arbejdsløs + Count_Studerende + Count_NA)) * 100
+  )
+
+# Print the summarized participant dataframe
+print(participant_summary)
+
+# Summarize overall counts and percentages of each Arbejdsstatus category
+overall_summary <- Demographics_wide %>%
+  group_by(Arbejdsstatus) %>%
+  summarize(
+    Count = n(),  # Count of participants in each Arbejdsstatus category
+    Percent = (n() / nrow(Demographics_wide)) * 100  # Calculate percentage of each category
+  ) %>%
+  
+# Print the overall summary of Arbejdsstatus categories
+print(overall_summary)
+
+```
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by TimePoint
+  group_by(ParticipantID) %>%
+  fill(Arbejdsstatus, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+
+```
+
+
+```{r}
+# Summarize the data by ParticipantID and take the first non-NA value for Arbejdsstatus
+summary_Arbejdsstatus <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    First_Arbejdsstatus = first(na.omit(Arbejdsstatus)),  # Take the first non-NA value for Arbejdsstatus
+    .groups = 'drop'  # Drop the grouping after summarizing
+  ) %>%
+  count(First_Arbejdsstatus)  # Count how many participants have each value for Arbejdsstatus
+
+# Print the summarized data
+print(summary_Arbejdsstatus)
+
+```
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by TimePoint
+  group_by(ParticipantID) %>%
+  fill(Uddannelsesniveau, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+
+```
+
+
+```{r}
+# Summarize the data by ParticipantID and take the first non-NA value for Education
+summary_Uddannelsesniveau <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    First_Uddannelsesniveau = first(na.omit(Uddannelsesniveau)),  # Take the first non-NA value for Education
+    .groups = 'drop'  # Drop the grouping after summarizing
+  ) %>%
+  count(First_Uddannelsesniveau)  # Count how many participants are in each education category
+
+# Print the summarized data
+print(summary_Uddannelsesniveau)
+
+```
+
+
+```{r}
+Demographics_wide <- Demographics_wide %>%
+  arrange(ParticipantID, TimePoint) %>%  # Ensure data is ordered by TimePoint
+  group_by(ParticipantID) %>%
+  fill(Region, .direction = "downup") %>%  # Fills down, then fills up within each participant
+  ungroup()
+
+```
+
+```{r}
+# Summarize the data by ParticipantID and take the first non-NA value for Region
+summary_Region <- Demographics_wide %>%
+  group_by(ParticipantID) %>%
+  summarize(
+    First_Region = first(na.omit(Region)),  # Take the first non-NA value for Region
+    .groups = 'drop'  # Drop the grouping after summarizing
+  ) %>%
+  count(First_Region)  # Count how many participants are in each region
+
+# Print the summarized data
+print(summary_Region)
+
+```
+
+
+
+```{r}
+install.packages("kableExtra")
+library(kableExtra)
+
+# Assuming 'summarize_categorical' returns a data frame
+demographics_summary <- summarize_categorical(Demographics_wide, "Group")
+
+# Use kableExtra to format the table
+demographics_summary %>%
+  kable("html", caption = "Demographic Summary of Group Variable") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+```
+
+
+*EPDS Cronbacgs Alpha*
+```{r}
+pacman::p_load(psych)
+
+EPDS_wide <- EPDS %>% 
+  pivot_wider(
+    id_cols = c(ParticipantID, TimePoint),
+    names_from = Question,
+    values_from = CleanResponse)
+
+# Exclude ParticipantID and TimePoint
+EPDS_question_data <- EPDS_wide[, !(names(EPDS_wide) %in% c("ParticipantID", "TimePoint"))]
+
+# Check column types
+str(EPDS_question_data)
+
+#Converting to dataframe
+EPDS_question_data <- as.data.frame(EPDS_question_data)
+
+EPDS_question_data <- unnest(EPDS_question_data, cols = everything())
+
+# If needed, convert to numeric
+EPDS_question_data <- data.frame(lapply(EPDS_question_data, as.numeric))
+
+EPDS_alpha <- alpha(EPDS_question_data, use = "pairwise.complete.obs")
+
+print(EPDS_alpha$total$raw_alpha)
+```
+
+*GAD7 Cronbachs Alpha*
+```{r}
+GAD7_wide <- GAD7 %>% 
+  pivot_wider(
+    id_cols = c(ParticipantID, TimePoint),
+    names_from = Question,
+    values_from = CleanResponse)
+
+# Exclude ParticipantID and TimePoint
+GAD7_question_data <- GAD7_wide[, !(names(GAD7_wide) %in% c("ParticipantID", "TimePoint"))]
+
+# Check column types
+str(GAD7_question_data)
+
+#Converting to dataframe
+GAD7_question_data <- as.data.frame(GAD7_question_data)
+
+GAD7_question_data <- unnest(GAD7_question_data, cols = everything())
+
+# If needed, convert to numeric
+GAD7_question_data <- data.frame(lapply(GAD7_question_data, as.numeric))
+
+GAD7_alpha <- alpha(GAD7_question_data, use = "pairwise.complete.obs")
+
+print(GAD7_alpha$total$raw_alpha)
+```
+
+*WHO5 Cronbachs alpha*
+```{r}
+WHO5_wide <- WHO5 %>% 
+  pivot_wider(
+    id_cols = c(ParticipantID, TimePoint),
+    names_from = Question,
+    values_from = CleanResponse)
+
+# Exclude ParticipantID and TimePoint
+WHO5_question_data <- WHO5_wide[, !(names(WHO5_wide) %in% c("ParticipantID", "TimePoint"))]
+
+# Check column types
+str(WHO5_question_data)
+
+#Converting to dataframe
+WHO5_question_data <- as.data.frame(WHO5_question_data)
+
+WHO5_question_data <- unnest(WHO5_question_data, cols = everything())
+
+# If needed, convert to numeric
+WHO5_question_data <- data.frame(lapply(WHO5_question_data, as.numeric))
+
+WHO5_alpha <- alpha(WHO5_question_data, use = "pairwise.complete.obs")
+
+print(WHO5_alpha$total$raw_alpha)
+```
+
+*PSQI Cronbahcs Alpha*
+
+```{r}
+missing_percentage <- colMeans(is.na(PSQI_wide)) * 100
+print(missing_percentage)
+
+# Exclude ParticipantID and TimePoint and Q1, and Q3 as they are time objects, and lastly columns with more than 20% missing data
+PSQI_question_data <- PSQI_wide[, !(names(PSQI_wide) %in% c("ParticipantID", "TimePoint", "Q1", "Q3", "Q5j2", "Q10e1", "Q10e2"))]
+
+
+# Check column types
+str(PSQI_question_data)
+
+#Converting to dataframe
+PSQI_question_data <- as.data.frame(PSQI_question_data)
+
+PSQI_question_data <- unnest(PSQI_question_data, cols = everything())
+
+# If needed, convert to numeric
+PSQI_question_data <- data.frame(lapply(PSQI_question_data, as.numeric))
+
+PSQI_alpha <- alpha(PSQI_question_data, use = "pairwise.complete.obs", check.keys=TRUE)
+
+print(PSQI_alpha$total$raw_alpha)
+
+
+#----------
+#Alpha on Components:
+# Select only the desired columns
+selected_columns <- c("Q9", "Component2", "Q4_Score", "Component4", "Component5", "Q6", "Component7")
+
+# Create a new dataframe with these columns
+PSQI_components <- PSQI_wide[, selected_columns]
+
+PSQI_components <- as.data.frame(PSQI_components)
+
+PSQI_components <- data.frame(lapply(PSQI_components, as.numeric))
+
+PSQI_alpha <- alpha(PSQI_components, use = "pairwise.complete.obs")
+
+print(PSQI_alpha$total$raw_alpha)
+```
+
+
+*Missingness*
+
+```{r}
+md.pattern(Demographics, rotate.names = T)
+```
+
+```{r}
+#Prediction 'matrix' where BirthDate is 1 because we want to use BirthDate to impute Group which should make sense!
+preds <- matrix(c(rep(0,10), 1, rep(0, 3)), byrow = TRUE, nrow = 1)
+
+#We want to predict group from Timestamp and ChildBirthDate
+bls <- "Group"
+
+ImpGroup <- mice(Demographics,
+                 maxit= 10, #We probably need another number
+                 method = 'logreg',
+                 m = 10,
+                 predictorMatrix = preds,
+                 blocks = bls,
+                 seed = 222)
+
+#They apparently all have possible values! yayy - The original datapoints are just hiding behind the imputed data points. 
+stripplot(ImpGroup, Group, 
+          xlab="Imputation Number", 
+          jitter = F, 
+          pch = 1.2, cex = 1,
+          par.settings = list(superpose.symbol = list(alpha = 0.2)))
+
+#VIM::marginplot()
+
+#Should we pool the data?? And what does that do?
+models <- with(ImpGroup, {
+  dat <- data.frame(
+    "ParticipantID" = ParticipantID,
+    "BirthDate" = BirthDate,
+    "Group" = Group
+  )
+  dat_long <- reshape(
+    data = dat,
+    varying = c("BirthDate", "Group"),
+    timevar = "day", #Idk what to do with this one
+    idvar = "ParticipantID",
+    direction = "long",
+    sep = " ")
+  
+  dat_long <- data_long[order(dat_long$ParticipantID, dat_long$day), ]
+  
+  geeglm() #timestamp 31:15 in the video)
+  
+})
+  
+summary(pool(models, dfcom = df.residual(model.complete.GEE)))
+
+# #CHAT SAYS:
+# #Maybe use plot() to chech for convergence
+# plot(ImpGroup)
+# 
+# #Use summary() outputs from the two to assess whether they are similar
+# summary(ImpGroup)
+# summary(Demographics)
+# #Can I compare the two using t-test or anova or anything like that?? To see whether they are deviating? Or is it okay that they are deviating? 
+# 
+# ggplot() +
+#   geom_density(data = Demographics, aes(x = x), color = "blue") +  # Original data
+#   geom_density(data = complete(ImpGroup, action = 1), aes(x = x), color = "red")  # Imputed data (1st dataset)
+# #THIS MUST ALSO BE THE WAY TO ASSESS THE DIFFERENT IMPUTATIONS!
+
+```
+
+```{r}
+#MICE TRYOUT
+pacman::p_load(mice)
+
+md.pattern(Demographics, rotate.names = T)
+
+Demographics %>% 
+  summary(Response[Question == Question[9818]])
+
+#imputed_data <- mice(Demographics, m = 5, method = 'pmm', seed = 123)
+
+#stripplot(imputed_data) # For imputed values
+
+```
+
